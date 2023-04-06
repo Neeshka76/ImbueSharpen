@@ -10,7 +10,7 @@ using SnippetCode;
 
 namespace ImbueSharpen
 {
-    public class ImbueSharpenLevelModule : LevelModule
+    public class ImbueSharpenLevelModule : ThunderScript
     {
         private Item rightHandItem;
         private Item leftHandItem;
@@ -20,11 +20,19 @@ namespace ImbueSharpen
         private bool rightCollidingWithOtherHand = false;
         private Vector3 rightPositionOnSwordStart = Vector3.zero;
         private bool rightSharpenDone = false;
-        public override IEnumerator OnLoadCoroutine()
+
+        public override void ScriptEnable()
         {
             EventManager.onPossess += EventManager_onPossess;
             EventManager.onUnpossess += EventManager_onUnpossess;
-            return base.OnLoadCoroutine();
+            base.ScriptEnable();
+        }
+
+        public override void ScriptDisable()
+        {
+            EventManager.onPossess -= EventManager_onPossess;
+            EventManager.onUnpossess -= EventManager_onUnpossess;
+            base.ScriptDisable();
         }
 
         private void EventManager_onUnpossess(Creature creature, EventTime eventTime)
@@ -81,10 +89,9 @@ namespace ImbueSharpen
             }
         }
 
-        public override void Update()
+        public override void ScriptUpdate()
         {
-            base.Update();
-
+            base.ScriptUpdate();
             if (leftHandItem != null)
             {
                 if (leftHandItem.mainHandler.IsPlayer())
@@ -138,29 +145,29 @@ namespace ImbueSharpen
                     // Colliding with the hand
                     if (item.mainHandler.otherHand.grabbedHandle == null)
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.rb.velocity) < -speed)
+                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.physicBody.rigidBody.velocity) < -speed)
                         {
                             //Activate Imbue
                             item.UnImbueItem();
                             if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster.spellInstance.id);
+                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
                             leftSharpenDone = true;
                         }
                     }
                     // Colliding with another item
                     else
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.rb.velocity, item.rb.velocity) < -speed)
+                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity, item.physicBody.rigidBody.velocity) < -speed)
                         {
                             //Activate Imbue
                             item.UnImbueItem();
                             if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster.spellInstance.id);
+                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
                             if (item.mainHandler.otherHand.caster.spellInstance != null && item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed)
                             {
                                 item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
                                 if (item.mainHandler.otherHand.caster.spellInstance != null)
-                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster.spellInstance.id);
+                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster, item.mainHandler.otherHand.caster.spellInstance.id);
                             }
                             leftSharpenDone = true;
                         }
@@ -208,29 +215,29 @@ namespace ImbueSharpen
                     // Colliding with the hand
                     if (item.mainHandler.otherHand.grabbedHandle == null)
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.rb.velocity) < -speed)
+                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.physicBody.rigidBody.velocity) < -speed)
                         {
                             //Activate Imbue
                             item.UnImbueItem();
                             if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster.spellInstance.id);
+                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
                             rightSharpenDone = true;
                         }
                     }
                     // Colliding with another item
                     else
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.rb.velocity, item.rb.velocity) < -speed)
+                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity, item.physicBody.rigidBody.velocity) < -speed)
                         {
                             //Activate Imbue
                             item.UnImbueItem();
                             if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster.spellInstance.id);
+                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
                             if (item.mainHandler.otherHand.caster.spellInstance != null && item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed)
                             {
                                 item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
                                 if (item.mainHandler.otherHand.caster.spellInstance != null)
-                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster.spellInstance.id);
+                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster, item.mainHandler.otherHand.caster.spellInstance.id);
                             }
                             rightSharpenDone = true;
                         }

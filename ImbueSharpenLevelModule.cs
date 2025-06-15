@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ThunderRoad;
+﻿using ThunderRoad;
 using UnityEngine;
-using SnippetCode;
 
 namespace ImbueSharpen
 {
@@ -20,6 +13,18 @@ namespace ImbueSharpen
         private bool rightCollidingWithOtherHand = false;
         private Vector3 rightPositionOnSwordStart = Vector3.zero;
         private bool rightSharpenDone = false;
+
+        public enum ButtonPress
+        {
+            Alternate,
+            Trigger,
+            Grip
+        }
+
+        [ModOptionCategory("Button Press Options", 1)]
+        [ModOption(name: "Button Press", tooltip: "Select which button is pressed to allow the imbue sharpening",
+            saveValue = true, order = 1)]
+        public static ButtonPress buttonPress;
 
         public override void ScriptEnable()
         {
@@ -37,221 +42,208 @@ namespace ImbueSharpen
 
         private void EventManager_onUnpossess(Creature creature, EventTime eventTime)
         {
-            if (EventTime.OnStart == eventTime)
-            {
-                creature.handLeft.OnGrabEvent -= HandLeft_OnGrabEvent;
-                creature.handLeft.OnUnGrabEvent -= HandLeft_OnUnGrabEvent;
-                creature.handRight.OnGrabEvent -= HandRight_OnGrabEvent;
-                creature.handRight.OnUnGrabEvent -= HandRight_OnUnGrabEvent;
-            }
+            if (eventTime == EventTime.OnStart) return;
+            creature.handLeft.OnGrabEvent -= HandLeft_OnGrabEvent;
+            creature.handLeft.OnUnGrabEvent -= HandLeft_OnUnGrabEvent;
+            creature.handRight.OnGrabEvent -= HandRight_OnGrabEvent;
+            creature.handRight.OnUnGrabEvent -= HandRight_OnUnGrabEvent;
         }
 
         private void EventManager_onPossess(Creature creature, EventTime eventTime)
         {
-            if (EventTime.OnEnd == eventTime)
-            {
-                creature.handLeft.OnGrabEvent += HandLeft_OnGrabEvent;
-                creature.handLeft.OnUnGrabEvent += HandLeft_OnUnGrabEvent;
-                creature.handRight.OnGrabEvent += HandRight_OnGrabEvent;
-                creature.handRight.OnUnGrabEvent += HandRight_OnUnGrabEvent;
-            }
+            if (eventTime == EventTime.OnStart) return;
+            creature.handLeft.OnGrabEvent += HandLeft_OnGrabEvent;
+            creature.handLeft.OnUnGrabEvent += HandLeft_OnUnGrabEvent;
+            creature.handRight.OnGrabEvent += HandRight_OnGrabEvent;
+            creature.handRight.OnUnGrabEvent += HandRight_OnUnGrabEvent;
         }
 
         private void HandRight_OnUnGrabEvent(Side side, Handle handle, bool throwing, EventTime eventTime)
         {
-            if (eventTime == EventTime.OnEnd)
-            {
-                rightHandItem = null;
-            }
+            if (eventTime == EventTime.OnEnd) return;
+            rightHandItem = null;
         }
 
-        private void HandRight_OnGrabEvent(Side side, Handle handle, float axisPosition, HandlePose orientation, EventTime eventTime)
+        private void HandRight_OnGrabEvent(Side side, Handle handle, float axisPosition, HandlePose orientation,
+            EventTime eventTime)
         {
-            if (eventTime == EventTime.OnEnd)
-            {
-                rightHandItem = handle.item;
-            }
+            if (eventTime == EventTime.OnStart) return;
+            rightHandItem = handle.item;
         }
 
         private void HandLeft_OnUnGrabEvent(Side side, Handle handle, bool throwing, EventTime eventTime)
         {
-            if (eventTime == EventTime.OnEnd)
-            {
-                leftHandItem = null;
-            }
+            if (eventTime == EventTime.OnEnd) return;
+            leftHandItem = null;
         }
 
-        private void HandLeft_OnGrabEvent(Side side, Handle handle, float axisPosition, HandlePose orientation, EventTime eventTime)
+        private void HandLeft_OnGrabEvent(Side side, Handle handle, float axisPosition, HandlePose orientation,
+            EventTime eventTime)
         {
-            if (eventTime == EventTime.OnEnd)
-            {
-                leftHandItem = handle.item;
-            }
+            if (eventTime == EventTime.OnStart) return;
+            leftHandItem = handle.item;
+        }
+
+        private void CheckItem(Item item, bool isLeft)
+        {
+            if (item == null) return;
+            if (!item.mainHandler.IsPlayer()) return;
+            if ((!item.mainHandler.playerHand.controlHand.alternateUsePressed ||
+                 buttonPress != ButtonPress.Alternate)
+                && (!item.mainHandler.playerHand.controlHand.gripPressed ||
+                    buttonPress != ButtonPress.Grip)
+                && (!item.mainHandler.playerHand.controlHand.castPressed ||
+                    buttonPress != ButtonPress.Trigger)) return;
+            if (isLeft)
+                LeftSharpeningMethod(item, 0.1f, 0.3f);
+            else
+                RightSharpeningMethod(item, 0.1f, 0.3f);
         }
 
         public override void ScriptUpdate()
         {
             base.ScriptUpdate();
-            if (leftHandItem != null)
-            {
-                if (leftHandItem.mainHandler.IsPlayer())
-                {
-                    if (leftHandItem.mainHandler.playerHand.controlHand.alternateUsePressed)
-                    {
-                        //LeftSharpeningMethod(leftHandItem, 0.3f, 0.5f);
-                        LeftSharpeningMethod(leftHandItem, 0.1f, 0.3f);
-                    }
-                }
-            }
-            if (rightHandItem != null)
-            {
-                if (rightHandItem.mainHandler.IsPlayer())
-                {
-                    if (rightHandItem.mainHandler.playerHand.controlHand.alternateUsePressed)
-                    {
-                        RightSharpeningMethod(rightHandItem, 0.1f, 0.3f);
-                    }
-                }
-            }
+            CheckItem(leftHandItem, true);
+            CheckItem(rightHandItem, false);
         }
 
         private void LeftSharpeningMethod(Item item, float distance, float speed)
         {
-            if (item.GetComponent<CollisionHandler>().isColliding)
+            if (item.mainCollisionHandler.isColliding)
             {
-                foreach (CollisionInstance collisionInstance in item.GetComponent<CollisionHandler>().collisions)
+                foreach (CollisionInstance collisionInstance in item.mainCollisionHandler.collisions)
                 {
                     // Colliding with the hand
                     if (item.mainHandler.otherHand.grabbedHandle == null)
                     {
-                        if (collisionInstance.targetColliderGroup?.collisionHandler?.ragdollPart is RagdollPart part && (part.ragdoll.creature.handLeft == item.mainHandler.otherHand || part.ragdoll.creature.handRight == item.mainHandler.otherHand) && !leftCollidingWithOtherHand)
-                        {
-                            leftCollidingWithOtherHand = true;
-                            leftPositionOnSwordStart = item.mainHandler.otherHand.transform.position;
-                        }
+                        if (collisionInstance.targetColliderGroup?.collisionHandler?.ragdollPart is not RagdollPart part ||
+                            (part.ragdoll.creature.handLeft != item.mainHandler.otherHand &&
+                             part.ragdoll.creature.handRight != item.mainHandler.otherHand) ||
+                            leftCollidingWithOtherHand) continue;
+                        leftCollidingWithOtherHand = true;
+                        leftPositionOnSwordStart = item.mainHandler.otherHand.transform.position;
                     }
                     // Colliding with another item
                     else
                     {
-                        if (collisionInstance.targetColliderGroup?.collisionHandler?.item?.mainHandler == item.mainHandler.otherHand && !leftCollidingWithOtherHand)
-                        {
-                            leftCollidingWithOtherHand = true;
-                            leftPositionOnSwordStart = item.mainHandler.otherHand.grabbedHandle.item.transform.position;
-                        }
+                        if (collisionInstance.targetColliderGroup?.collisionHandler?.item?.mainHandler !=
+                            item.mainHandler.otherHand || leftCollidingWithOtherHand) continue;
+                        leftCollidingWithOtherHand = true;
+                        leftPositionOnSwordStart = item.mainHandler.otherHand.grabbedHandle.item.transform.position;
                     }
                 }
-                if (leftCollidingWithOtherHand && !leftSharpenDone)
+                if (!leftCollidingWithOtherHand || leftSharpenDone) return;
+                // Colliding with the hand
+                if (item.mainHandler.otherHand.grabbedHandle == null)
                 {
-                    // Colliding with the hand
-                    if (item.mainHandler.otherHand.grabbedHandle == null)
+                    if (!(Vector3.Distance(item.mainHandler.otherHand.transform.position,
+                              leftPositionOnSwordStart) >
+                          distance) || !(Vector3.Dot(item.mainHandler.otherHand.Velocity(),
+                            item.physicBody.rigidBody.velocity) < -speed)) return;
+                    //Activate Imbue
+                    item.UnImbueItem();
+                    if (item.mainHandler.caster.spellInstance != null)
+                        item.ImbueItem(item.mainHandler.caster);
+                }
+                // Colliding with another item
+                else
+                {
+                    if (!(Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position,
+                            leftPositionOnSwordStart) > distance) ||
+                        !(Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity,
+                            item.physicBody.rigidBody.velocity) < -speed)) return;
+                    //Activate Imbue
+                    item.UnImbueItem();
+                    if (item.mainHandler.caster.spellInstance != null)
+                        item.ImbueItem(item.mainHandler.caster);
+                    if (item.mainHandler.otherHand.caster.spellInstance != null
+                        && (item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed && buttonPress == ButtonPress.Alternate
+                            || item.mainHandler.otherHand.playerHand.controlHand.gripPressed && buttonPress == ButtonPress.Grip
+                            || item.mainHandler.otherHand.playerHand.controlHand.castPressed && buttonPress == ButtonPress.Trigger))
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.physicBody.rigidBody.velocity) < -speed)
-                        {
-                            //Activate Imbue
-                            item.UnImbueItem();
-                            if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
-                            leftSharpenDone = true;
-                        }
-                    }
-                    // Colliding with another item
-                    else
-                    {
-                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, leftPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity, item.physicBody.rigidBody.velocity) < -speed)
-                        {
-                            //Activate Imbue
-                            item.UnImbueItem();
-                            if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
-                            if (item.mainHandler.otherHand.caster.spellInstance != null && item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed)
-                            {
-                                item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
-                                if (item.mainHandler.otherHand.caster.spellInstance != null)
-                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster, item.mainHandler.otherHand.caster.spellInstance.id);
-                            }
-                            leftSharpenDone = true;
-                        }
+                        item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
+                        if (item.mainHandler.otherHand.caster.spellInstance != null)
+                            item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster);
                     }
                 }
+                leftSharpenDone = true;
             }
             else
             {
-                if (leftCollidingWithOtherHand)
-                {
-                    leftCollidingWithOtherHand = false;
-                    leftPositionOnSwordStart = Vector3.zero;
-                    leftSharpenDone = false;
-                }
+                if (!leftCollidingWithOtherHand) return;
+                leftCollidingWithOtherHand = false;
+                leftPositionOnSwordStart = Vector3.zero;
+                leftSharpenDone = false;
             }
         }
 
         private void RightSharpeningMethod(Item item, float distance, float speed)
         {
-            if (item.GetComponent<CollisionHandler>().isColliding)
+            if (item.mainCollisionHandler.isColliding)
             {
-                foreach (CollisionInstance collisionInstance in item.GetComponent<CollisionHandler>().collisions)
+                foreach (CollisionInstance collisionInstance in item.mainCollisionHandler.collisions)
                 {
                     // Colliding with the hand
                     if (item.mainHandler.otherHand.grabbedHandle == null)
                     {
-                        if (collisionInstance.targetColliderGroup?.collisionHandler?.ragdollPart is RagdollPart part && (part.ragdoll.creature.handLeft == item.mainHandler.otherHand || part.ragdoll.creature.handRight == item.mainHandler.otherHand) && !rightCollidingWithOtherHand)
-                        {
-                            rightCollidingWithOtherHand = true;
-                            rightPositionOnSwordStart = item.mainHandler.otherHand.transform.position;
-                        }
+                        if (collisionInstance.targetColliderGroup?.collisionHandler?.ragdollPart is not RagdollPart part ||
+                            (part.ragdoll.creature.handLeft != item.mainHandler.otherHand &&
+                             part.ragdoll.creature.handRight != item.mainHandler.otherHand) ||
+                            rightCollidingWithOtherHand) continue;
+                        rightCollidingWithOtherHand = true;
+                        rightPositionOnSwordStart = item.mainHandler.otherHand.transform.position;
                     }
                     // Colliding with another item
                     else
                     {
-                        if (collisionInstance.targetColliderGroup?.collisionHandler?.item?.mainHandler == item.mainHandler.otherHand && !rightCollidingWithOtherHand)
-                        {
-                            rightCollidingWithOtherHand = true;
-                            rightPositionOnSwordStart = item.mainHandler.otherHand.grabbedHandle.item.transform.position;
-                        }
+                        if (collisionInstance.targetColliderGroup?.collisionHandler?.item?.mainHandler !=
+                            item.mainHandler.otherHand || rightCollidingWithOtherHand) continue;
+                        rightCollidingWithOtherHand = true;
+                        rightPositionOnSwordStart =
+                            item.mainHandler.otherHand.grabbedHandle.item.transform.position;
                     }
                 }
-                if (rightCollidingWithOtherHand && !rightSharpenDone)
+                if (!rightCollidingWithOtherHand || rightSharpenDone) return;
+                // Colliding with the hand
+                if (item.mainHandler.otherHand.grabbedHandle == null)
                 {
-                    // Colliding with the hand
-                    if (item.mainHandler.otherHand.grabbedHandle == null)
+                    if (!(Vector3.Distance(item.mainHandler.otherHand.transform.position, rightPositionOnSwordStart) >
+                          distance) || !(Vector3.Dot(item.mainHandler.otherHand.Velocity(),
+                            item.physicBody.rigidBody.velocity) < -speed)) return;
+                    //Activate Imbue
+                    item.UnImbueItem();
+                    if (item.mainHandler.caster.spellInstance != null)
+                        item.ImbueItem(item.mainHandler.caster);
+                }
+                // Colliding with another item
+                else
+                {
+                    if (!(Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position,
+                            rightPositionOnSwordStart) > distance) ||
+                        !(Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity,
+                            item.physicBody.rigidBody.velocity) < -speed)) return;
+                    //Activate Imbue
+                    item.UnImbueItem();
+                    if (item.mainHandler.caster.spellInstance != null)
+                        item.ImbueItem(item.mainHandler.caster);
+                    if (item.mainHandler.otherHand.caster.spellInstance != null
+                        && (item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed && buttonPress == ButtonPress.Alternate 
+                            || item.mainHandler.otherHand.playerHand.controlHand.gripPressed && buttonPress == ButtonPress.Grip
+                            || item.mainHandler.otherHand.playerHand.controlHand.castPressed && buttonPress == ButtonPress.Trigger))
                     {
-                        if (Vector3.Distance(item.mainHandler.otherHand.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.Velocity(), item.physicBody.rigidBody.velocity) < -speed)
-                        {
-                            //Activate Imbue
-                            item.UnImbueItem();
-                            if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
-                            rightSharpenDone = true;
-                        }
-                    }
-                    // Colliding with another item
-                    else
-                    {
-                        if (Vector3.Distance(item.mainHandler.otherHand.grabbedHandle.item.transform.position, rightPositionOnSwordStart) > distance && Vector3.Dot(item.mainHandler.otherHand.grabbedHandle.item.physicBody.rigidBody.velocity, item.physicBody.rigidBody.velocity) < -speed)
-                        {
-                            //Activate Imbue
-                            item.UnImbueItem();
-                            if (item.mainHandler.caster.spellInstance != null)
-                                item.ImbueItem(item.mainHandler.caster, item.mainHandler.caster.spellInstance.id);
-                            if (item.mainHandler.otherHand.caster.spellInstance != null && item.mainHandler.otherHand.playerHand.controlHand.alternateUsePressed)
-                            {
-                                item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
-                                if (item.mainHandler.otherHand.caster.spellInstance != null)
-                                    item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster, item.mainHandler.otherHand.caster.spellInstance.id);
-                            }
-                            rightSharpenDone = true;
-                        }
+                        item.mainHandler.otherHand.grabbedHandle.item.UnImbueItem();
+                        if (item.mainHandler.otherHand.caster.spellInstance != null)
+                            item.mainHandler.otherHand.grabbedHandle.item.ImbueItem(item.mainHandler.otherHand.caster);
                     }
                 }
+                rightSharpenDone = true;
             }
             else
             {
-                if (rightCollidingWithOtherHand)
-                {
-                    rightCollidingWithOtherHand = false;
-                    rightPositionOnSwordStart = Vector3.zero;
-                    rightSharpenDone = false;
-                }
+                if (!rightCollidingWithOtherHand) return;
+                rightCollidingWithOtherHand = false;
+                rightPositionOnSwordStart = Vector3.zero;
+                rightSharpenDone = false;
             }
         }
     }
